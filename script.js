@@ -251,6 +251,30 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
     });
 
     window.addEventListener('resize', () => updateSlider(currentIndex));
+
+    // Suporte a swipe (arrastar o dedo) no celular
+    let touchStartX = 0;
+    let touchEndX = 0;
+
+    track.addEventListener('touchstart', (e) => {
+        touchStartX = e.changedTouches[0].screenX;
+    });
+
+    track.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        const swipeDistance = touchStartX - touchEndX;
+        const minSwipeDistance = 50;
+
+        if (swipeDistance > minSwipeDistance) {
+            let nextIndex = currentIndex + 1;
+            if (nextIndex >= slides.length) nextIndex = 0;
+            updateSlider(nextIndex);
+        } else if (swipeDistance < -minSwipeDistance) {
+            let prevIndex = currentIndex - 1;
+            if (prevIndex < 0) prevIndex = slides.length - 1;
+            updateSlider(prevIndex);
+        }
+    });
 }
 
 // ===================================
