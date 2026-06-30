@@ -246,23 +246,35 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
         updateSlider(prevIndex);
     });
 
-    dots.forEach((dot, index) => {
-        dot.addEventListener('click', () => updateSlider(index));
-    });
-
-    window.addEventListener('resize', () => updateSlider(currentIndex));
-
     // Suporte a swipe (arrastar o dedo) no celular
     let touchStartX = 0;
-    let touchEndX = 0;
+    let touchCurrentX = 0;
+    let isDragging = false;
 
     track.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-    });
+        touchStartX = e.touches[0].screenX;
+        touchCurrentX = touchStartX;
+        isDragging = true;
+    }, { passive: true });
 
-    track.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
-        const swipeDistance = touchStartX - touchEndX;
+    track.addEventListener('touchmove', (e) => {
+        if (!isDragging) return;
+        touchCurrentX = e.touches[0].screenX;
+
+        const diffX = Math.abs(touchCurrentX - touchStartX);
+        const diffY = Math.abs(e.touches[0].screenY - e.touches[0].screenY);
+
+        // Se o movimento for predominantemente horizontal, trava o scroll da página
+        if (diffX > 10) {
+            e.preventDefault();
+        }
+    }, { passive: false });
+
+    track.addEventListener('touchend', () => {
+        if (!isDragging) return;
+        isDragging = false;
+
+        const swipeDistance = touchStartX - touchCurrentX;
         const minSwipeDistance = 50;
 
         if (swipeDistance > minSwipeDistance) {
