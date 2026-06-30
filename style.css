@@ -1623,7 +1623,7 @@ button {
     align-items: center;
     }
     .hero-stats { grid-template-columns: 1fr; }
-    .hero-buttons { flex-direction: column; margin-top: 60px; }
+    .hero-buttons { flex-direction: column; margin-top: 40px; }
     .hero-content {
     grid-template-columns: 1fr !important;
     width: 100% !important;
