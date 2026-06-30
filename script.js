@@ -215,6 +215,7 @@ const dotsContainer = document.querySelector('.carousel-dots');
 
 if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
     let currentIndex = 0;
+    let slideWidth = 0;
 
     slides.forEach((_, i) => {
         const dot = document.createElement('button');
@@ -224,15 +225,20 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
     });
     const dots = Array.from(dotsContainer.querySelectorAll('.carousel-dot'));
 
+    const measureSlideWidth = () => {
+        slideWidth = slides[0].getBoundingClientRect().width + 24;
+    };
+
     const updateSlider = (index) => {
-        const slideWidth = slides[0].getBoundingClientRect().width;
-        track.style.transform = `translateX(-${index * (slideWidth + 24)}px)`;
-        
+        track.style.transform = `translateX(-${index * slideWidth}px)`;
+
         dots.forEach(dot => dot.classList.remove('active'));
         dots[index].classList.add('active');
-        
+
         currentIndex = index;
     };
+
+    measureSlideWidth();
 
     nextBtn.addEventListener('click', () => {
         let nextIndex = currentIndex + 1;
@@ -246,19 +252,33 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
         updateSlider(prevIndex);
     });
 
+    dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => updateSlider(index));
+    });
+
+    window.addEventListener('resize', () => {
+        measureSlideWidth();
+        updateSlider(currentIndex);
+    });
+
     // Suporte a swipe (arrastar o dedo) no celular
     let touchStartX = 0;
     let touchStartY = 0;
     let touchCurrentX = 0;
     let isSwiping = false;
-    let directionLocked = false;
+    let isHorizontalSwipe = false;
+
+    const resetSwipeState = () => {
+        isSwiping = false;
+        isHorizontalSwipe = false;
+    };
 
     track.addEventListener('touchstart', (e) => {
         touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
         touchCurrentX = touchStartX;
         isSwiping = true;
-        directionLocked = false;
+        isHorizontalSwipe = false;
     }, { passive: true });
 
     track.addEventListener('touchmove', (e) => {
@@ -268,23 +288,19 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
         const diffX = touchCurrentX - touchStartX;
         const diffY = e.touches[0].clientY - touchStartY;
 
-        // Decide a direção do gesto só uma vez, no início do movimento
-        if (!directionLocked && (Math.abs(diffX) > 5 || Math.abs(diffY) > 5)) {
-            directionLocked = true;
-            track.dataset.horizontalSwipe = Math.abs(diffX) > Math.abs(diffY) ? 'true' : 'false';
+        if (Math.abs(diffX) > 5 || Math.abs(diffY) > 5) {
+            isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
         }
 
-        // Se o gesto for horizontal, trava o scroll da página nesse toque
-        if (track.dataset.horizontalSwipe === 'true') {
+        if (isHorizontalSwipe) {
             e.preventDefault();
         }
     }, { passive: false });
 
     track.addEventListener('touchend', () => {
         if (!isSwiping) return;
-        isSwiping = false;
 
-        if (track.dataset.horizontalSwipe === 'true') {
+        if (isHorizontalSwipe) {
             const swipeDistance = touchStartX - touchCurrentX;
             const minSwipeDistance = 40;
 
@@ -299,8 +315,10 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
             }
         }
 
-        track.dataset.horizontalSwipe = '';
+        resetSwipeState();
     });
+
+    track.addEventListener('touchcancel', resetSwipeState);
 }
 
 // ===================================
