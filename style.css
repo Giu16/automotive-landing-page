@@ -315,7 +315,7 @@ button {
     inset: 0;
     background:
         var(--gradient-hero),
-        url('https://images.unsplash.com/photo-1486262715619-67b85e0b08d3?w=1920&q=80') center/cover no-repeat;
+        url('img/pagina\ inicial.jpeg') center/cover no-repeat;
     z-index: -1;
 }
 /* Brilho sutil de fundo */
