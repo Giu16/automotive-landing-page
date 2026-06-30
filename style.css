@@ -1618,9 +1618,9 @@ button {
     /* Topo (Hero) */
     .hero-title { font-size: 5.0rem; }
     .hero {
-    min-height: 81vh;
-    padding: 200px 0 70px;
-    align-items: flex-start;
+    min-height: 100vh;
+    padding: 200px 0 100px;
+    align-items: center;
     }
     .hero-stats { grid-template-columns: 1fr; }
     .hero-buttons { flex-direction: column; margin-top: 60px; }
