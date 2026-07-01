@@ -205,7 +205,7 @@ const highlightNavigation = () => {
 window.addEventListener('scroll', highlightNavigation);
 
 // ===================================
-// Testimonials Google-Style Carousel
+// Testimonials Google-Style Carousel (Safari Armor Fix)
 // ===================================
 const track = document.querySelector('.carousel-track');
 const slides = Array.from(document.querySelectorAll('.review-card'));
@@ -217,8 +217,13 @@ if (track && slides.length > 0 && dotsContainer) {
     let currentIndex = 0;
     let slideWidth = 0;
     let maxIndex = 0;
+
+    // 1. BLINDAGEM CSS PARA SAFARI (Injetado via JS para garantir que aplique)
+    track.style.touchAction = 'pan-y'; // Diz ao iPhone: "Eu cuido do eixo X, você cuida do Y"
+    track.style.overscrollBehaviorX = 'none'; // Impede o efeito "elástico" de voltar página do iOS
+    track.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
  
-    // 1. Renderiza os dots dinamicamente
+    // 2. Renderiza os dots dinamicamente
     dotsContainer.innerHTML = '';
     slides.forEach((_, i) => {
         const dot = document.createElement('button');
@@ -228,38 +233,36 @@ if (track && slides.length > 0 && dotsContainer) {
     });
     const dots = Array.from(dotsContainer.querySelectorAll('.carousel-dot'));
  
-    // 2. Função PURA para medir. Isolada da animação para evitar Reflow no Safari!
+    // 3. Função de medição segura (offsetWidth é mais confiável no Safari)
     const measureSlideWidth = () => {
         if (!slides[0]) return;
         const trackStyles = window.getComputedStyle(track);
         const gap = parseFloat(trackStyles.columnGap || trackStyles.gap) || 0;
-        slideWidth = slides[0].getBoundingClientRect().width + gap;
         
-        // Calcula o limite máximo real considerando quantos cards cabem na tela
-        const containerWidth = track.parentElement.getBoundingClientRect().width;
-        const cardsPerView = Math.round(containerWidth / slideWidth) || 1;
+        slideWidth = slides[0].offsetWidth + gap;
+        
+        const containerWidth = track.parentElement.offsetWidth;
+        const cardsPerView = Math.max(Math.round(containerWidth / slideWidth), 1);
         maxIndex = Math.max(slides.length - cardsPerView, 0);
     };
  
-    // 3. Atualiza o slider centralizando a lógica (Swipe, Clique e Dots usam a mesma base)
+    // 4. Atualiza o slider
     const updateSlider = (index) => {
-        // Lógica de loop contínuo
+        // Garante que o loop funcione (1-2-3-1-2-3) sem quebrar limites
         if (index > maxIndex) index = 0;
         if (index < 0) index = maxIndex;
  
         track.style.transform = `translateX(-${index * slideWidth}px)`;
  
-        // Atualiza bolinhas
         dots.forEach(dot => dot.classList.remove('active'));
         if (dots[index]) dots[index].classList.add('active');
  
         currentIndex = index;
     };
  
-    // Inicialização
     measureSlideWidth();
     
-    // Reforço para carregamento de fontes customizadas
+    // Fallback para quando as fontes carregarem e mudarem o tamanho do card
     if (document.fonts && document.fonts.ready) {
         document.fonts.ready.then(() => {
             measureSlideWidth();
@@ -267,7 +270,6 @@ if (track && slides.length > 0 && dotsContainer) {
         });
     }
  
-    // Recalcula apenas quando a tela mudar de tamanho (com debounce para não travar)
     window.addEventListener('resize', () => {
         window.requestAnimationFrame(() => {
             measureSlideWidth();
@@ -275,75 +277,36 @@ if (track && slides.length > 0 && dotsContainer) {
         });
     });
  
-    // 4. Controles de Botões e Dots
     if (nextBtn) nextBtn.addEventListener('click', () => updateSlider(currentIndex + 1));
     if (prevBtn) prevBtn.addEventListener('click', () => updateSlider(currentIndex - 1));
     dots.forEach((dot, index) => dot.addEventListener('click', () => updateSlider(index)));
  
-    // 5. O SEGREDO DO SAFARI (Touch Events)
-    // touch-action: pan-y diz ao WebKit: "Deixe o usuário rolar para baixo, 
-    // mas eu (Javascript) cuido dos arrastes horizontais". Evita o touchcancel.
-    track.style.touchAction = 'pan-y';
- 
+    // 5. O SEGREDO: LEITURA DE SWIPE MÍNIMA E IGNORANDO O TOUCHMOVE
     let touchStartX = 0;
-    let touchStartY = 0;
-    let touchCurrentX = 0;
-    let isSwiping = false;
-    let swipeDirectionDecided = false;
-    let isHorizontalSwipe = false;
+    let touchEndX = 0;
  
+    // Captura apenas o exato momento que o dedo toca a tela
     track.addEventListener('touchstart', (e) => {
-        // Removida a gambiarra do transition: 'none'. Deixe o CSS fluir.
-        touchStartX = e.touches[0].clientX;
-        touchStartY = e.touches[0].clientY;
-        touchCurrentX = touchStartX;
-        isSwiping = true;
-        swipeDirectionDecided = false;
-        isHorizontalSwipe = false;
+        touchStartX = e.changedTouches[0].screenX;
     }, { passive: true });
  
-    track.addEventListener('touchmove', (e) => {
-        if (!isSwiping) return;
- 
-        touchCurrentX = e.touches[0].clientX;
-        const diffX = touchCurrentX - touchStartX;
-        const diffY = e.touches[0].clientY - touchStartY;
- 
-        // Trava a decisão da direção no primeiro milissegundo do toque
-        if (!swipeDirectionDecided) {
-            if (Math.abs(diffX) > 5 || Math.abs(diffY) > 5) {
-                isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
-                swipeDirectionDecided = true;
-            }
-        }
- 
-        // Se for lateral, impede a tela de "dançar" (scroll)
-        if (isHorizontalSwipe && e.cancelable) {
-            e.preventDefault();
-        }
-    }, { passive: false });
- 
-    const handleSwipeEnd = () => {
-        if (!isSwiping || !isHorizontalSwipe) {
-            isSwiping = false;
-            return;
-        }
- 
-        const swipeDistance = touchStartX - touchCurrentX;
-        const minSwipeDistance = 40; // Sensibilidade
+    // Captura apenas o exato momento que o dedo sai da tela
+    track.addEventListener('touchend', (e) => {
+        touchEndX = e.changedTouches[0].screenX;
+        processSwipe();
+    }, { passive: true });
+
+    // Calcula a diferença e move. O Safari não tem como interromper isso.
+    const processSwipe = () => {
+        const swipeDistance = touchStartX - touchEndX;
+        const minSwipeDistance = 45; // Precisa arrastar 45px para contar como swipe (evita toques acidentais)
  
         if (swipeDistance > minSwipeDistance) {
-            updateSlider(currentIndex + 1); // Deslizou pra esquerda (Próximo)
+            updateSlider(currentIndex + 1); // Arrasto pra esquerda = Próximo
         } else if (swipeDistance < -minSwipeDistance) {
-            updateSlider(currentIndex - 1); // Deslizou pra direita (Anterior)
+            updateSlider(currentIndex - 1); // Arrasto pra direita = Anterior
         }
- 
-        isSwiping = false;
     };
- 
-    // Dispara a finalização tanto no end quanto no cancel (proteção nativa do iOS)
-    track.addEventListener('touchend', handleSwipeEnd);
-    track.addEventListener('touchcancel', () => { isSwiping = false; });
 }
 
 // ===================================
