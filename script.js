@@ -205,7 +205,7 @@ const highlightNavigation = () => {
 window.addEventListener('scroll', highlightNavigation);
 
 // ===================================
-// Testimonials Infinite Carousel (Safari Proof)
+// Testimonials Infinite Carousel (Safari Proof - De Verdade)
 // ===================================
 const track = document.querySelector('.carousel-track');
 const originalSlides = Array.from(document.querySelectorAll('.review-card'));
@@ -231,11 +231,9 @@ if (track && originalSlides.length > 0 && dotsContainer) {
     }
 
     // 2. CLONAGEM PARA LOOP INFINITO
-    // Clonamos o primeiro slide e adicionamos ao final
     const firstClone = originalSlides[0].cloneNode(true);
     track.appendChild(firstClone);
     
-    // Atualiza lista com o clone incluso
     const allSlides = Array.from(document.querySelectorAll('.review-card'));
 
     dotsContainer.innerHTML = '';
@@ -260,8 +258,12 @@ if (track && originalSlides.length > 0 && dotsContainer) {
 
     if (nextBtn) {
         nextBtn.addEventListener('click', () => {
-            if (track.scrollLeft >= (allSlides.length - 1) * getSlideWidth()) {
-                track.scrollLeft = 0; // Se estiver no fim, volta ao início
+            // Correção no nextBtn para evitar o mesmo glitch no pulo manual
+            if (Math.ceil(track.scrollLeft) >= (allSlides.length - 1) * getSlideWidth() - 10) {
+                track.style.scrollSnapType = 'none';
+                track.scrollLeft = 0;
+                void track.offsetWidth; // Força reflow instantâneo
+                track.style.scrollSnapType = 'x mandatory';
             } else {
                 track.scrollBy({ left: getSlideWidth(), behavior: 'smooth' });
             }
@@ -280,9 +282,10 @@ if (track && originalSlides.length > 0 && dotsContainer) {
         });
     });
 
-    // 4. OBSERVER BLINDADO PARA LOOP INFINITO
-    const observerOptions = { root: track, threshold: 0.8 }; // Aumentei o threshold para 0.8 para ser mais preciso
-    let isResetting = false; // Flag para travar execuções múltiplas
+    // 4. OBSERVER BLINDADO CONTRA O WEBKIT
+    // Threshold reduzido para 0.7 para garantir o disparo no mobile
+    const observerOptions = { root: track, threshold: 0.7 }; 
+    let isResetting = false;
 
     const observer = new IntersectionObserver((entries) => {
         entries.forEach(entry => {
@@ -291,19 +294,26 @@ if (track && originalSlides.length > 0 && dotsContainer) {
                 
                 // Se chegou no clone (o último slide extra)
                 if (index === allSlides.length - 1) {
-                    isResetting = true; // Trava o observador
+                    isResetting = true; 
                     
-                    // Reset instantâneo (behavior: 'auto')
-                    track.scrollTo({ left: 0, behavior: 'auto' });
+                    // O PULO DO GATO PRO SAFARI:
+                    // Remove o snap antes de reposicionar.
+                    track.style.scrollSnapType = 'none';
                     
-                    // Reseta a flag após um curto período para permitir novos movimentos
-                    setTimeout(() => { isResetting = false; }, 500);
+                    // requestAnimationFrame empilha a execução após a re-renderização do frame atual.
+                    requestAnimationFrame(() => {
+                        track.scrollTo({ left: 0, behavior: 'auto' });
+                        
+                        // Espera o pulo acontecer de fato antes de devolver o snap
+                        requestAnimationFrame(() => {
+                            track.style.scrollSnapType = 'x mandatory';
+                            isResetting = false;
+                        });
+                    });
                     
-                    // Força a bolinha 1 ficar ativa
                     dots.forEach(d => d.classList.remove('active'));
                     dots[0].classList.add('active');
                 } else {
-                    // Atualiza bolinhas normalmente
                     dots.forEach(d => d.classList.remove('active'));
                     if (dots[index]) dots[index].classList.add('active');
                 }
