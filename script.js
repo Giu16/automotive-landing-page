@@ -205,108 +205,90 @@ const highlightNavigation = () => {
 window.addEventListener('scroll', highlightNavigation);
 
 // ===================================
-// Testimonials Google-Style Carousel (Safari Armor Fix)
+// Testimonials Native Scroll Carousel (Bypass Safari Bug)
 // ===================================
 const track = document.querySelector('.carousel-track');
 const slides = Array.from(document.querySelectorAll('.review-card'));
 const nextBtn = document.querySelector('.carousel-btn.next');
 const prevBtn = document.querySelector('.carousel-btn.prev');
 const dotsContainer = document.querySelector('.carousel-dots');
- 
-if (track && slides.length > 0 && dotsContainer) {
-    let currentIndex = 0;
-    let slideWidth = 0;
-    let maxIndex = 0;
 
-    // 1. BLINDAGEM CSS PARA SAFARI (Injetado via JS para garantir que aplique)
-    track.style.touchAction = 'pan-y'; // Diz ao iPhone: "Eu cuido do eixo X, você cuida do Y"
-    track.style.overscrollBehaviorX = 'none'; // Impede o efeito "elástico" de voltar página do iOS
-    track.style.transition = 'transform 0.4s cubic-bezier(0.25, 1, 0.5, 1)';
- 
-    // 2. Renderiza os dots dinamicamente
+if (track && slides.length > 0 && dotsContainer) {
+    // 1. FORÇANDO O COMPORTAMENTO NATIVO VIA JS
+    // Transformamos o track num container de scroll nativo (perfeito no Safari)
+    track.style.display = 'flex';
+    track.style.overflowX = 'auto';
+    track.style.scrollSnapType = 'x mandatory';
+    track.style.scrollBehavior = 'smooth';
+    track.style.scrollbarWidth = 'none'; // Esconde scrollbar no Firefox
+    track.style.webkitOverflowScrolling = 'touch'; // Fluidez máxima no iOS
+    
+    // Injeta estilo para esconder a scrollbar no Chrome/Safari
+    if (!document.getElementById('carousel-hide-scroll')) {
+        const style = document.createElement('style');
+        style.id = 'carousel-hide-scroll';
+        style.textContent = `.carousel-track::-webkit-scrollbar { display: none !important; }`;
+        document.head.appendChild(style);
+    }
+
+    // 2. RENDERIZA AS BOLINHAS E PREPARA OS CARDS
     dotsContainer.innerHTML = '';
-    slides.forEach((_, i) => {
+    slides.forEach((slide, i) => {
         const dot = document.createElement('button');
         dot.classList.add('carousel-dot');
         if (i === 0) dot.classList.add('active');
         dotsContainer.appendChild(dot);
+        
+        // Garante que cada card "puxe" o scroll nativo (snap)
+        slide.style.scrollSnapAlign = 'center'; // Centraliza o card na tela ao deslizar
+        slide.style.flexShrink = '0';
     });
+
     const dots = Array.from(dotsContainer.querySelectorAll('.carousel-dot'));
- 
-    // 3. Função de medição segura (offsetWidth é mais confiável no Safari)
-    const measureSlideWidth = () => {
-        if (!slides[0]) return;
-        const trackStyles = window.getComputedStyle(track);
-        const gap = parseFloat(trackStyles.columnGap || trackStyles.gap) || 0;
-        
-        slideWidth = slides[0].offsetWidth + gap;
-        
-        const containerWidth = track.parentElement.offsetWidth;
-        const cardsPerView = Math.max(Math.round(containerWidth / slideWidth), 1);
-        maxIndex = Math.max(slides.length - cardsPerView, 0);
+
+    // 3. LÓGICA DE NAVEGAÇÃO POR BOTÕES E DOTS
+    const getSlideWidth = () => {
+        const gap = parseFloat(window.getComputedStyle(track).gap) || 0;
+        return slides[0].offsetWidth + gap;
     };
- 
-    // 4. Atualiza o slider
-    const updateSlider = (index) => {
-        // Garante que o loop funcione (1-2-3-1-2-3) sem quebrar limites
-        if (index > maxIndex) index = 0;
-        if (index < 0) index = maxIndex;
- 
-        track.style.transform = `translateX(-${index * slideWidth}px)`;
- 
-        dots.forEach(dot => dot.classList.remove('active'));
-        if (dots[index]) dots[index].classList.add('active');
- 
-        currentIndex = index;
-    };
- 
-    measureSlideWidth();
-    
-    // Fallback para quando as fontes carregarem e mudarem o tamanho do card
-    if (document.fonts && document.fonts.ready) {
-        document.fonts.ready.then(() => {
-            measureSlideWidth();
-            updateSlider(currentIndex);
+
+    if (nextBtn) {
+        nextBtn.addEventListener('click', () => {
+            track.scrollBy({ left: getSlideWidth(), behavior: 'smooth' });
         });
     }
- 
-    window.addEventListener('resize', () => {
-        window.requestAnimationFrame(() => {
-            measureSlideWidth();
-            updateSlider(currentIndex);
+
+    if (prevBtn) {
+        prevBtn.addEventListener('click', () => {
+            track.scrollBy({ left: -getSlideWidth(), behavior: 'smooth' });
+        });
+    }
+
+    dots.forEach((dot, index) => {
+        dot.addEventListener('click', () => {
+            const targetScroll = index * getSlideWidth();
+            track.scrollTo({ left: targetScroll, behavior: 'smooth' });
         });
     });
- 
-    if (nextBtn) nextBtn.addEventListener('click', () => updateSlider(currentIndex + 1));
-    if (prevBtn) prevBtn.addEventListener('click', () => updateSlider(currentIndex - 1));
-    dots.forEach((dot, index) => dot.addEventListener('click', () => updateSlider(index)));
- 
-    // 5. O SEGREDO: LEITURA DE SWIPE MÍNIMA E IGNORANDO O TOUCHMOVE
-    let touchStartX = 0;
-    let touchEndX = 0;
- 
-    // Captura apenas o exato momento que o dedo toca a tela
-    track.addEventListener('touchstart', (e) => {
-        touchStartX = e.changedTouches[0].screenX;
-    }, { passive: true });
- 
-    // Captura apenas o exato momento que o dedo sai da tela
-    track.addEventListener('touchend', (e) => {
-        touchEndX = e.changedTouches[0].screenX;
-        processSwipe();
-    }, { passive: true });
 
-    // Calcula a diferença e move. O Safari não tem como interromper isso.
-    const processSwipe = () => {
-        const swipeDistance = touchStartX - touchEndX;
-        const minSwipeDistance = 45; // Precisa arrastar 45px para contar como swipe (evita toques acidentais)
- 
-        if (swipeDistance > minSwipeDistance) {
-            updateSlider(currentIndex + 1); // Arrasto pra esquerda = Próximo
-        } else if (swipeDistance < -minSwipeDistance) {
-            updateSlider(currentIndex - 1); // Arrasto pra direita = Anterior
-        }
+    // 4. ATUALIZAR DOTS AUTOMATICAMENTE AO DESLIZAR O DEDO
+    // O IntersectionObserver detecta perfeitamente qual card está visível sem bugar o touch
+    const observerOptions = {
+        root: track,
+        threshold: 0.6 // Quando 60% do card aparecer, ele atualiza a bolinha
     };
+
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                const index = slides.indexOf(entry.target);
+                dots.forEach(dot => dot.classList.remove('active'));
+                if (dots[index]) dots[index].classList.add('active');
+            }
+        });
+    }, observerOptions);
+
+    slides.forEach(slide => observer.observe(slide));
 }
 
 // ===================================
