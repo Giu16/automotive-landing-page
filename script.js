@@ -282,8 +282,18 @@ if (track && slides.length > 0 && dotsContainer) {
         entries.forEach(entry => {
             if (entry.isIntersecting) {
                 const index = slides.indexOf(entry.target);
+                
+                // Atualiza a bolinha ativa
                 dots.forEach(dot => dot.classList.remove('active'));
                 if (dots[index]) dots[index].classList.add('active');
+
+                // LÓGICA DO LOOP:
+                // Se o usuário chegou no último card, espera 2 segundos e volta pro primeiro
+                if (index === slides.length - 1) {
+                    setTimeout(() => {
+                        track.scrollTo({ left: 0, behavior: 'smooth' });
+                    }, 2000); // 2000ms = 2 segundos de pausa no último card
+                }
             }
         });
     }, observerOptions);
