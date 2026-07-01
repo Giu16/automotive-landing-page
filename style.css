@@ -990,8 +990,6 @@ button {
     gap: 20px;
     transition: transform 0.4s cubic-bezier(0.25, 1, 0.5, 1);
     width: 100%;
-    touch-action: pan-y;
-    -webkit-overflow-scrolling: touch;
 }
 
 .review-card {
