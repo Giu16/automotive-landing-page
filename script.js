@@ -212,11 +212,11 @@ const slides = Array.from(document.querySelectorAll('.review-card'));
 const nextBtn = document.querySelector('.carousel-btn.next');
 const prevBtn = document.querySelector('.carousel-btn.prev');
 const dotsContainer = document.querySelector('.carousel-dots');
-
+ 
 if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
     let currentIndex = 0;
     let slideWidth = 0;
-
+ 
     slides.forEach((_, i) => {
         const dot = document.createElement('button');
         dot.classList.add('carousel-dot');
@@ -224,24 +224,38 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
         dotsContainer.appendChild(dot);
     });
     const dots = Array.from(dotsContainer.querySelectorAll('.carousel-dot'));
-
+ 
     const measureSlideWidth = () => {
         const trackStyles = window.getComputedStyle(track);
         const gap = parseFloat(trackStyles.columnGap || trackStyles.gap) || 0;
         slideWidth = slides[0].getBoundingClientRect().width + gap;
     };
-
+ 
+    // FIX iOS Safari: remede a largura ANTES de todo movimento, não só uma
+    // vez no load. O @import de fonte no CSS carrega assíncrono; o WebKit
+    // pinta com fallback, mede errado, troca a fonte depois e nunca recalcula
+    // — daí o card "quase" alinhado no segundo swipe.
     const updateSlider = (index) => {
+        measureSlideWidth();
         track.style.transform = `translateX(-${index * slideWidth}px)`;
-
+ 
         dots.forEach(dot => dot.classList.remove('active'));
         dots[index].classList.add('active');
-
+ 
         currentIndex = index;
     };
-
+ 
     measureSlideWidth();
-
+ 
+    // Reforço: quando a fonte Barlow terminar de carregar, remede e
+    // realinha o slide atual sem mudar de índice.
+    if (document.fonts && document.fonts.ready) {
+        document.fonts.ready.then(() => {
+            measureSlideWidth();
+            updateSlider(currentIndex);
+        });
+    }
+ 
     nextBtn.addEventListener('click', () => {
         const containerWidth = track.parentElement.getBoundingClientRect().width;
         const cardsPerView = Math.round(containerWidth / slideWidth) || 1;
@@ -250,66 +264,73 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
         if (nextIndex > maxIndex) nextIndex = 0;
         updateSlider(nextIndex);
     });
-
+ 
     prevBtn.addEventListener('click', () => {
         let prevIndex = currentIndex - 1;
         if (prevIndex < 0) prevIndex = slides.length - 1;
         updateSlider(prevIndex);
     });
-
+ 
     dots.forEach((dot, index) => {
         dot.addEventListener('click', () => updateSlider(index));
     });
-
+ 
     window.addEventListener('resize', () => {
         measureSlideWidth();
         updateSlider(currentIndex);
     });
-
+ 
     // Suporte a swipe (arrastar o dedo) no celular
     let touchStartX = 0;
     let touchStartY = 0;
     let touchCurrentX = 0;
     let isSwiping = false;
     let isHorizontalSwipe = false;
-
+ 
     const resetSwipeState = () => {
         isSwiping = false;
         isHorizontalSwipe = false;
     };
-
+ 
     track.addEventListener('touchstart', (e) => {
-     
-       touchStartX = e.touches[0].clientX;
+        // FIX iOS Safari: cancela qualquer transição CSS em andamento antes
+        // de iniciar um novo swipe. O WebKit é mais permissivo que o Blink
+        // em disparar touchstart durante uma transition ativa, o que
+        // acumulava dois translateX conflitantes e travava o card "no meio".
+        track.style.transition = 'none';
+        void track.offsetWidth; // força reflow síncrono, descarta a transition anterior
+        track.style.transition = '';
+ 
+        touchStartX = e.touches[0].clientX;
         touchStartY = e.touches[0].clientY;
         touchCurrentX = touchStartX;
         isSwiping = true;
         isHorizontalSwipe = false;
     }, { passive: true });
-
+ 
     track.addEventListener('touchmove', (e) => {
         if (!isSwiping) return;
-
+ 
         touchCurrentX = e.touches[0].clientX;
         const diffX = touchCurrentX - touchStartX;
         const diffY = e.touches[0].clientY - touchStartY;
-
+ 
         if (Math.abs(diffX) > 5 || Math.abs(diffY) > 5) {
             isHorizontalSwipe = Math.abs(diffX) > Math.abs(diffY);
         }
-
+ 
         if (isHorizontalSwipe) {
             e.preventDefault();
         }
     }, { passive: false });
-
+ 
     track.addEventListener('touchend', () => {
         if (!isSwiping) return;
-
+ 
         if (isHorizontalSwipe) {
             const swipeDistance = touchStartX - touchCurrentX;
             const minSwipeDistance = 40;
-
+ 
             if (swipeDistance > minSwipeDistance) {
                 let nextIndex = currentIndex + 1;
                 if (nextIndex >= slides.length) nextIndex = 0;
@@ -320,10 +341,10 @@ if (track && slides.length > 0 && dotsContainer && nextBtn && prevBtn) {
                 updateSlider(prevIndex);
             }
         }
-
+ 
         resetSwipeState();
     });
-
+ 
     track.addEventListener('touchcancel', resetSwipeState);
 }
 
